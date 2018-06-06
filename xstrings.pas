@@ -4,6 +4,8 @@
    ====================================================================
 
    This file is part of xlib for FreePascal
+   
+   https://github.com/xqtr/xlib
     
    For contact look at Another Droid BBS [andr01d.zapto.org:9999],
    FSXNet and ArakNet.
