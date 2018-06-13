@@ -165,12 +165,11 @@ Type
     PwdCrc      : LongInt;
     Cost        : LongInt;
   End;
-  
+    
   SubFieldType = Record
-    LoId    : Word;
-    HiId    : Word;
+    LoID    : Word;
+    HiID    : Word;
     DataLen : LongInt;
-    //Data    : Array[1..1000] of Char;
   End;
 
   JamIdxType = Record
@@ -190,9 +189,13 @@ Type
     HeaderFile  : TFileStream;
     IndexFile   : TFileStream;
     TxtFile     : TFileStream;
+    OldMod      : LongInt;
+    fSearch     : String;
+    fSearchPos  : LongInt;
     
     Header      : JamHdrType;
     MsgHeader   : JamMsgHdrType;
+    MsgHdrPos   : LongInt;
     
     MsgCount    : LongInt;
     MsgText     : TStringList;
@@ -222,29 +225,133 @@ Type
     
     Function Init:Boolean;
     
-    Function LoadMsg(N:LongInt):Boolean;
-    Function FirstMsg:Boolean;
-    Function LastMsg:Boolean;
-    Function GetMsgCount:LongInt;
-    Function GetMsgText(N:LongInt):Boolean;
-    Function NextMsg:Boolean;    
+    Function  LoadMsg(N:LongInt):Boolean;
+    Function  FirstMsg:Boolean;
+    Function  LastMsg:Boolean;
+    Function  GetMsgCount:LongInt;
+    Function  GetMsgText(N:LongInt):Boolean;
+    Function  NextMsg:Boolean;    
+    Function  SaveHeader:Boolean;
     
-    Function IsLocal        : Boolean; 
-    Function IsCrash        : Boolean; 
-    Function IsKillSent     : Boolean; 
-    Function IsSent         : Boolean; 
-    Function IsFAttach      : Boolean; 
-    Function IsFileReq      : Boolean; 
-    Function IsRcvd         : Boolean; 
-    Function IsPriv         : Boolean; 
-    Function IsDeleted      : Boolean; 
-    Function IsEncrypted    : Boolean; 
-    Function IsCompressed   : Boolean; 
-    Function IsEscaped      : Boolean; 
-    Function IsLocked       : Boolean;     
+    Function  CreateMsgBase (Path,Name:String; MaxMsg: Word; MaxDays: Word): SmallInt;
+    Procedure SetAttr1 (Mask: Cardinal; St: Boolean);
+    Function  GetHighMsgNum: LongInt;
+    Function  BaseChanged:Boolean;
+    Function  ReReadHeader:Boolean;
+    
+    Function  SearchFirst(Sub:String; CS:Boolean):LongInt;
+    Function  SearchNext(Sub:String; CS:Boolean):LongInt;
+    Function  MsgAtTextPos(P:LongInt):LongInt;
+    
+    Function  GetLastReadUNum(U:LongInt):LongInt; 
+    Function  GetLastReadUCrc(UCRC:LongInt):LongInt; 
+    Function  DeleteUser(U:LongInt):Boolean;
+    Function  FindLastRead(UCRC:LongInt; Var L:JamLastType):Boolean;
+    Function  SetLastRead(User,LastRead:LongInt):Boolean;
+    
+    Function  NewMsg(MFrom,MTo,MSubj:String; FAddr,TAddr:RecEchoMailAddr ;FName:String):SmallInt;
+    Function  DeleteMsg(N:LongInt; PurgeText:Boolean):Boolean;
+    
+    Procedure UpdateModCounter;
+    
+    Function  IsLocal        : Boolean; 
+    Function  IsCrash        : Boolean; 
+    Function  IsKillSent     : Boolean; 
+    Function  IsSent         : Boolean; 
+    Function  IsFAttach      : Boolean; 
+    Function  IsFileReq      : Boolean; 
+    Function  IsRcvd         : Boolean; 
+    Function  IsPriv         : Boolean; 
+    Function  IsDeleted      : Boolean; 
+    Function  IsEncrypted    : Boolean; 
+    Function  IsCompressed   : Boolean; 
+    Function  IsEscaped      : Boolean; 
+    Function  IsLocked       : Boolean;     
   End;  
+  
+  Function Addr2Str (Addr : RecEchoMailAddr) : String;
+  Function Str2Addr (S: String; Var Addr: RecEchoMailAddr) : Boolean;
+  Function EchoMailAddrValid(Addr:RecEchoMailAddr): Boolean;
+  Function JamStrCrc (St: String): LongInt;
 
 Implementation
+
+Uses
+  xFileIO,
+  xDateTime;
+  
+Function Addr2Str (Addr : RecEchoMailAddr) : String;
+Var
+  Temp : String[20];
+Begin
+  Temp := Int2Str(Addr.Zone) + ':' + Int2Str(Addr.Net) + '/' +
+          Int2Str(Addr.Node);
+
+  If Addr.Point <> 0 Then Temp := Temp + '.' + Int2Str(Addr.Point);
+
+  Result := Temp;
+End;
+
+Function Str2Addr (S: String; Var Addr: RecEchoMailAddr) : Boolean;
+Var
+  A     : Byte;
+  B     : Byte;
+  C     : Byte;
+  D     : Byte;
+  Point : Boolean;
+Begin
+  Result := False;
+  Point  := True;
+
+  D := Pos('@', S);
+  A := Pos(':', S);
+  B := Pos('/', S);
+  C := Pos('.', S);
+
+  If (A = 0) or (B <= A) Then Exit;
+
+  If D > 0 Then
+    Delete (S, D, 255);
+
+  If C = 0 Then Begin
+    Point      := False;
+    C          := Length(S) + 1;
+    Addr.Point := 0;
+  End;
+
+  Addr.Zone := Str2Int(Copy(S, 1, A - 1));
+  Addr.Net  := Str2Int(Copy(S, A + 1, B - 1 - A));
+  Addr.Node := Str2Int(Copy(S, B + 1, C - 1 - B));
+
+  If Point Then Addr.Point := Str2Int(Copy(S, C + 1, Length(S)));
+
+  Result := True;
+End;
+
+Function EchoMailAddrValid(Addr:RecEchoMailAddr): Boolean;
+Begin
+If ((Addr.Zone <> 0) or (Addr.Net <> 0) or
+        (Addr.Node <> 0) or (Addr.Point <> 0)) Then
+        Result:=True Else Result:=False;
+End;        
+
+Function Crc32 (Octet: Byte; CRC: LongInt) : LongInt;
+Begin
+  Crc32 := LongInt(CRC_32_TAB[Byte(CRC xor LongInt(Octet))] xor ((CRC shr 8) and $00FFFFFF));
+End;
+
+Function JamStrCrc (St: String): LongInt;
+Var
+  i: Word;
+  crc: LongInt;
+Begin
+  Crc := -1;
+
+  For i := 1 to Length(St) Do
+    Crc := Crc32(Ord(LoCase(St[i])), Crc);
+
+  JamStrCrc := Crc;
+End;
 
 Constructor TJamBase.Create;
 Begin
@@ -252,25 +359,32 @@ Begin
   MsgText := TStringList.Create;
 End;
 
+Function TJamBase.ReReadHeader:Boolean;
+Begin
+  Result := False;
+  HeaderFile.Seek(0,0);
+  HeaderFile.ReadBuffer(Header,SizeOf(Header));
+  OldMod := Header.ModCounter;
+  Result:=True;
+End;
+
 Function TJamBase.Init:Boolean;
 Begin
   Result := False;
   If Filename='' Then Exit;
   Try
-    HeaderFile := TFileStream.Create(Filename+'.jhr',fmOpenRead or fmShareDenyNone);
+    HeaderFile := TFileStream.Create(Filename+'.jhr',fmOpenReadWrite or fmShareDenyNone);
     HeaderFile.Seek(0,0);
-    IndexFile := TFileStream.Create(Filename+'.jdx',fmOpenRead or fmShareDenyNone);
+    IndexFile := TFileStream.Create(Filename+'.jdx',fmOpenReadWrite or fmShareDenyNone);
     IndexFile.Seek(0,0);
-    TxtFile := TFileStream.Create(Filename+'.jdt',fmOpenRead or fmShareDenyNone);
+    TxtFile := TFileStream.Create(Filename+'.jdt',fmOpenReadWrite or fmShareDenyNone);
     TxtFile.Seek(0,0);
   Except
-    System.Writeln;
-    System.Writeln;
     System.Writeln;
     System.Writeln('Error on Init');
     Exit;
   End;
-  HeaderFile.ReadBuffer(Header,SizeOf(Header));
+  HeaderFile.Read(Header,SizeOf(Header));
   If (Header.Signature[1] = 'J') And
       (Header.Signature[2] = 'A') And
       (Header.Signature[3] = 'M') And
@@ -278,6 +392,7 @@ Begin
     MsgCount:=GetMsgCount;
     Result:=True;
   End;
+  OldMod := Header.ModCounter;
 End;
 
 Destructor  TJamBase.Destroy;
@@ -289,18 +404,79 @@ Begin
   Inherited Destroy;
 End;
 
-Function TJamBase.GetMsgCount:LongInt;
+Function TJamBase.CreateMsgBase (Path,Name:String; MaxMsg: Word; MaxDays: Word): SmallInt;
 Var
-  i   : LongInt;
+  tf  : File Of Byte;
+  hdr : JamHdrType;
   idx : JamIdxType;
 Begin
-  IndexFile.Seek(0,0);
-  i:=0;
-  While IndexFile.Position < IndexFile.Size Do Begin
-    IndexFile.Read(idx,Sizeof(idx));
-    i:=i+1;
+  Result:=-100;
+  If FileExist(AddSlash(path)+Name+'.jhr') Then Result:=-1;
+  
+  Try
+    AssignFile(tf,AddSlash(path)+Name+'.jhr');
+    Rewrite(tf,1);
+  Except
+    Result:=-99;
+    Exit;
   End;
-  Result:=i;
+  
+  FillChar(hdr, SizeOf(hdr), #0);
+  hdr.Signature[1] :=  'J';
+  hdr.Signature[2] :=  'A';
+  hdr.Signature[3] :=  'M';
+  hdr.BaseMsgNum   := 1;
+  hdr.Created      := DateDos2Unix(CurDateDos);
+  hdr.PwdCrc       := -1;
+  BlockWrite(tf,hdr,Sizeof(hdr));
+  CloseFile(tf);
+  
+  Try
+    AssignFile(tf,AddSlash(path)+Name+'.jdx');
+    Rewrite(tf,1);
+    Seek(tf,0);
+    CloseFile(tf);
+  Except
+    Result := -98;
+    Exit;
+  End;
+  
+  Try
+  AssignFile(tf,AddSlash(path)+Name+'.jdt');
+  Rewrite(tf,1);
+  Seek(tf,0);
+  CloseFile(tf);
+  Except
+    Result := -97;
+    Exit;
+  End;
+  
+  Try
+  AssignFile(tf,AddSlash(path)+Name+'.jlr');
+  Rewrite(tf,1);
+  Seek(tf,0);
+  CloseFile(tf);
+  Except
+    Result := -96;
+    Exit;
+  End;
+ 
+  Result:=0;
+End;
+
+Function TJamBase.GetHighMsgNum: LongInt;
+Var
+  idx : JamIdxType;
+Begin
+  Result := Header.BaseMsgNum + (IndexFile.Size Div SizeOf(idx)) - 1;
+  //FileSize(JM^.IdxFile) - 1;
+End;
+
+Function TJamBase.GetMsgCount:LongInt;
+Var
+  idx : JamIdxType;
+Begin
+  result:=indexfile.size div sizeof(idx);
 End;
 
 Function TJamBase.LoadMsg(N:LongInt):Boolean;
@@ -310,20 +486,16 @@ Var
   SubLength : LongInt;
   SubEnd    : LongInt;
   SubF      : SubFieldType;
-  Data      : String;
+  Data      : String = '';
 Begin
   Result:=False;
   If N>MsgCount Then Exit;
-  IndexFile.Seek(0,0);
-  i:=0;
-  While (i<=N) Do Begin
-  //While (IndexFile.Position < IndexFile.Size) And (i<=N) Do Begin
-    IndexFile.Read(idx,Sizeof(idx));
-    i:=i+1;
-  End;
+  
+  IndexFile.Seek((N-1) * Sizeof(JamIdxType),0);
+  IndexFile.Read(idx,Sizeof(JamIdxType));
   
   If Idx.HdrLoc = -1 Then Exit;
-  
+  MsgHdrPos := Idx.HdrLoc;
   HeaderFile.Seek(Idx.HdrLoc,0);
   FillChar(MsgHeader,Sizeof(MsgHeader),#0);
   HeaderFile.Read(MsgHeader,SizeOf(MsgHeader));
@@ -333,9 +505,10 @@ Begin
   If SubLength<>0 Then Begin
     SubEnd := HeaderFile.Position+SubLength;
     While HeaderFile.Position < SubEnd Do Begin
-      //SetLength(Data,0);
-      Data:='';
-      HeaderFile.Read(SubF,SizeOf(SubFieldType));
+      SetLength(Data,0);
+      //Data:='';
+      Fillbyte(SubF,SizeOf(SubF),0);
+      HeaderFile.Read(SubF,SizeOf(SubF));
       SetLength(Data,SubF.DataLen);
       HeaderFile.Read(Data[1],SubF.DataLen);
       //Writeln('LoID:'+Int2Str(SubF.LoID));
@@ -344,14 +517,16 @@ Begin
         0:  Begin {Orig}
               FillChar(Orig, SizeOf(Orig), #0);
               Move(Data, Orig, SubF.DataLen);
+              //Str2Addr(Data,Orig);
             End;
         1:  Begin {Dest}
               FillChar(Dest, SizeOf(Dest), #0);
               Move(Data, Dest, SubF.DataLen);
+              //Str2Addr(Data,Dest);
             End;
         2:  Begin {From}
-              //SetLength(From,SubF.DataLen);
-              //Move(Data, From, SubF.DataLen);
+              SetLength(From,SubF.DataLen);
+              Move(Data, From, SubF.DataLen);
               From:=Data;
             End;
         3:  Begin
@@ -409,7 +584,7 @@ Var
 Begin
   Result:=False;
   If LoadMsg(N)= False Then Exit;
-  
+  l:='';
   TxtFile.Seek(MsgHeader.TextOfs,0);
   MsgText.Clear;
   c:=#0;
@@ -428,7 +603,7 @@ End;
 Function TJamBase.FirstMsg:Boolean;
 Begin
   Result:=False;
-  If Not LoadMsg(0) Then Exit;
+  If Not LoadMsg(1) Then Exit;
   MsgNo := 0;
   Result:=True;
 End;
@@ -436,17 +611,25 @@ End;
 Function TJamBase.LastMsg:Boolean;
 Begin
   Result:=False;
-  If Not LoadMsg(Header.ActiveMsgs-1) Then Exit;
-  MsgNo := Header.ActiveMsgs-1;
+  If Not LoadMsg(Header.ActiveMsgs) Then Exit;
+  MsgNo := Header.ActiveMsgs;
   Result:=True;
 End;
 
 Function TJamBase.NextMsg:Boolean;
 Begin
   Result:=False;
-  If MsgNo+1 <= Header.ActiveMsgs-1 Then MsgNo := MsgNo + 1;
+  If MsgNo+1 <= Header.ActiveMsgs Then MsgNo := MsgNo + 1;
   If Not LoadMsg(MsgNo) Then Exit;
   Result:=True;
+End;
+
+Procedure TJamBase.SetAttr1 (Mask: Cardinal; St: Boolean);
+Begin
+If St Then
+  MsgHeader.Attr1 := MsgHeader.Attr1 Or Mask
+Else
+  MsgHeader.Attr1 := MsgHeader.Attr1 And (Not Mask);
 End;
 
 Function TJamBase.IsLocal        : Boolean; 
@@ -514,6 +697,421 @@ Begin
   Result := (MsgHeader.Attr1 and Jam_Locked) <> 0;
 End;
 
+Function TJamBase.SaveHeader:Boolean;
+Begin
+  Result := False;
+  UpdateModCounter;
+  
+  HeaderFile.Seek(0,0);
+  Try
+    HeaderFile.Write(Header,Sizeof(Header));
+  Except
+    Exit;
+  End;
+  
+  Result:=True;
+End;
 
+Function TJamBase.NewMsg(MFrom,MTo,MSubj:String; FAddr,TAddr:RecEchoMailAddr ;FName:String):SmallInt;
+Var
+  hdr : JamMsgHdrType;
+  idx : JamIdxType;
+  f   : file of byte;
+  sf0  : SubFieldType;
+  sf1  : SubFieldType;
+  sf2  : SubFieldType;
+  sf3  : SubFieldType;
+  sf6  : SubFieldType;
+  Buff : Byte;
+  s    : String;
+Begin
+  Result:=-1;
+  if Not FileExist(Fname) Then Exit;
+  Result:=-2;
+  If Mfrom = '' Then Exit;
+  If MTo = '' Then Exit;
+  If MSubj = '' Then Exit;
+  
+  If BaseChanged Then Begin
+    Result:=-4;
+    ReReadHeader;
+  End;
+  Result:=-3;
+  
+  FillByte(hdr,Sizeof(hdr),0);
+  hdr.Signature[1] := 'J';{Set signature}
+  hdr.Signature[2] := 'A';
+  hdr.Signature[3] := 'M';
+  hdr.Signature[4] := #0;
+  hdr.rev :=1;
+  hdr.MsgNum := Header.ActiveMsgs+1;
+  hdr.DateArrived := DateDos2Unix(CurDateDos); {Get date processed}
+  hdr.DateWritten := DateDos2Unix(CurDateDos);
+  hdr.Attr1 := hdr.Attr1 Or Jam_TypeLocal;
+  
+  SetAttr1(Jam_TypeLocal, True);
+  
+  AssignFile(f,Fname);
+  Try
+    Reset(f,1);
+  Except
+    Result := -97;
+    Exit;
+  End;
+  
+  txtfile.seek(0,soend);
+  hdr.TextOfs := TxtFile.Size;
+  hdr.TextLen := FileSize(f)+1;
+    
+  sf2.LoId:=2;
+  sf2.HiId:=0;
+  If Length(MFrom)>100 THen MFrom:=Copy(MFrom,1,100);
+  //sf2.Data:=MFrom;
+  sf2.DataLen:=Length(MFrom);
+  //writeln(int2str(sf2.datalen));
+  hdr.SubFieldLen:=hdr.SubFieldLen+8+sf2.DataLen;
+  
+  sf3.LoId:=3;
+  sf3.HiId:=0;
+  If Length(MTo)>100 THen MTo:=Copy(MTo,1,100);
+  //sf3.Data:=MTo;
+  sf3.DataLen:=Length(Mto);
+  
+  hdr.SubFieldLen:=hdr.SubFieldLen+8+sf3.DataLen;
+  
+  If EchoMailAddrValid(Faddr) Then Begin
+    sf0.LoId:=0;
+    sf0.HiId:=0;
+    s:=Addr2Str(Faddr);
+    //sf0.Data:=s;
+    sf0.DataLen:=Length(s);
+    hdr.SubFieldLen:=hdr.SubFieldLen+8+sf0.DataLen;
+  End;
+  
+  If EchoMailAddrValid(Taddr) Then Begin
+    sf1.LoId:=1;
+    sf1.HiId:=0;
+    s:=Addr2Str(Taddr);
+    //sf1.Data:=s;
+    sf1.DataLen:=Length(S);
+    hdr.SubFieldLen:=hdr.SubFieldLen+8+sf1.DataLen;
+  End;
+  
+  sf6.LoId:=6;
+  sf6.HiId:=0;
+  If Length(MSubj)>100 THen MSubj:=Copy(MSubj,1,100);
+  //sf6.Data:=MSubj;
+  sf6.DataLen:=Length(msubj);
+  
+  hdr.SubFieldLen:=hdr.SubFieldLen+8+sf6.DataLen;
+  
+  HeaderFile.Seek(0,soEnd);
+  
+  idx.MsgToCrc := Crc32(8,JamStrCrc(MTo));
+  idx.HdrLoc   := HeaderFile.Size;
+  
+  IndexFile.Seek(IndexFile.Size,0);
+  IndexFile.Write(idx,SizeOf(Idx));
+  
+  
+  HeaderFile.WriteBuffer(hdr,SizeOf(hdr));
+  If EchoMailAddrValid(Faddr) Then Begin
+    HeaderFile.WriteBuffer(Sf0,8+sf0.DataLen);
+    s:=Addr2Str(Faddr);
+    HeaderFile.WriteBuffer(s,sf0.DataLen);
+  End;
+  If EchoMailAddrValid(Taddr) Then Begin
+    HeaderFile.WriteBuffer(Sf1,8+sf1.DataLen);
+    s:=Addr2Str(Taddr);
+    HeaderFile.WriteBuffer(s,sf1.DataLen);
+  End;
+  HeaderFile.WriteBuffer(Sf2,8+sf2.DataLen);
+  HeaderFile.WriteBuffer(MFrom,sf2.DataLen);
+  HeaderFile.WriteBuffer(Sf3,8+sf3.DataLen);
+  HeaderFile.WriteBuffer(MTo,sf3.DataLen);
+  HeaderFile.WriteBuffer(Sf6,8+sf6.DataLen);
+  HeaderFile.WriteBuffer(MSubj,sf6.DataLen);
+  
+  Try
+    TxtFile.Seek(0,SoEnd);
+    While Not EOF(F) Do begin
+      BlockRead(f,buff,1);
+      TxtFile.WriteBuffer(buff,1);
+    End;
+    buff:=13;
+    TxtFile.WriteBuffer(buff,1);
+  Except
+    Result:=-40;
+    CloseFile(f);
+    Exit;
+  End;
+  
+  CloseFile(f);
+  ReReadHeader;
+  Header.ActiveMsgs := Header.ActiveMsgs + 1;
+  If not SaveHeader Then Begin
+    Result:=-10;
+    Exit;
+  End;
+  ReReadHeader;
+  Result:=0;
+End;
+
+Function TJamBase.DeleteMsg(N:LongInt; PurgeText:Boolean):Boolean;
+Var
+  r : LongInt;
+  C : Char = 'Q';
+Begin
+  Result:=False;
+  If Not LoadMsg(N) Then Exit;
+  
+  If BaseChanged Then Begin
+    ReReadHeader;
+    If Not LoadMsg(N) Then Exit;
+  End;
+  
+  If PurgeText Then Begin
+    TxtFile.Seek(MsgHeader.TextOfs,0);
+    For r := 1 To MsgHeader.TextLen Do TxtFile.Write(C,1);
+  End;
+  
+  MsgHeader.TextLen:=0;
+  SetAttr1(Jam_Deleted, True);
+  HeaderFile.Seek(MsgHdrPos,0);
+  HeaderFile.WriteBuffer(MsgHeader,SizeOf(MsgHeader));
+  
+  Header.ActiveMsgs:=Header.ActiveMsgs-1;
+  MsgCount:=GetMsgCount;
+ 
+  SaveHeader;
+  ReReadHeader;
+  
+  Result:=True;
+End;
+  
+Procedure TJamBase.UpdateModCounter;
+Begin
+  Header.ModCounter:=Header.ModCounter+1;
+  If Header.ModCounter=$ffffffff then Header.ModCounter:=0;  
+End;  
+
+Function TJamBase.BaseChanged:Boolean;
+Begin
+  Result := Not (OldMod = Header.ModCounter);
+End;
+
+Function TJamBase.GetLastReadUNum(U:LongInt):LongInt; 
+Var
+  r : JamLastType;
+  f : TFileStream;
+  sz : Int64;
+Begin
+  Result:=-1;
+  Try
+    f := TFileStream.Create(Filename+'.jlr',fmOpenRead or fmShareDenyNone);
+    f.Seek(0,0);
+  Except
+    Exit;
+  End;
+  sz:=F.Size;
+  While F.Position < sz Do Begin
+    F.Read(r,Sizeof(r));
+    If r.UserNum = U Then Begin
+      Result:=r.HighRead;
+      Break;
+    End;
+  End;
+  f.free;
+End;
+
+Function TJamBase.GetLastReadUCrc(UCRC:LongInt):LongInt; 
+Var
+  r : JamLastType;
+  f : TFileStream;
+  sz : Int64;
+Begin
+  Result:=-1;
+  Try
+    f := TFileStream.Create(Filename+'.jlr',fmOpenRead or fmShareDenyNone);
+    f.Seek(0,0);
+  Except
+    Exit;
+  End;
+  sz := F.size;
+  While F.Position < sz Do Begin
+    F.Read(r,Sizeof(r));
+    If r.NameCrc = UCRC Then Begin
+      Result:=r.HighRead;
+      Break;
+    End;
+  End;
+  f.free;
+End;
+
+Function TJamBase.FindLastRead(UCRC:LongInt; Var L:JamLastType):Boolean;
+Var
+  f : TFileStream;
+  sz : Int64;
+Begin
+  Result:=False;
+  Try
+    f := TFileStream.Create(Filename+'.jlr',fmOpenRead or fmShareDenyNone);
+    f.Seek(0,0);
+  Except
+    Exit;
+  End;
+  sz := F.size;
+  While F.Position < sz Do Begin
+    F.Read(L,Sizeof(L));
+    If L.NameCrc = UCRC Then Begin
+      Result := True;
+      Break;
+    End;
+  End;
+  f.free;
+End;
+
+Function TJamBase.DeleteUser(U:LongInt):Boolean;
+Var
+  r : JamLastType;
+  f : TFileStream;
+  i : LongInt;
+  sz : Int64;
+Begin
+  Try
+    f := TFileStream.Create(Filename+'.jlr',fmOpenReadWrite or fmShareDenyNone);
+    f.Seek(0,0);
+  Except
+    Exit;
+  End;
+  i:=0;
+  sz := F.size;
+  While F.Position < sz Do Begin
+    F.Read(r,Sizeof(r));
+    If r.UserNum = U Then Begin
+      f.Seek(i*Sizeof(r),0);
+      r.UserNum := -1;
+      r.NameCRC := -1;
+      f.Write(r,sizeof(r));
+      Break;
+    End;
+    i:=i+1;
+  End;
+  f.free;
+End;
+
+Function TJamBase.SetLastRead(User,LastRead:LongInt):Boolean;
+Var
+  r : JamLastType;
+  f : TFileStream;
+  i : LongInt;
+  found : Boolean = false;
+  sz : Int64;
+Begin
+  Result:=False;
+  Try
+    f := TFileStream.Create(Filename+'.jlr',fmOpenReadWrite or fmShareDenyNone);
+  Except
+    Exit;
+  End;
+  f.seek(0,0);
+  i:=0;
+  sz := F.size;
+  While F.Position < sz Do Begin
+    F.Read(r,Sizeof(r));
+    If r.UserNum = User Then Begin
+      f.Seek(i*Sizeof(r),0);
+      r.LastRead := LastRead;
+      r.HighRead := LastRead;
+      f.Write(r,sizeof(r));
+      found :=true;
+      Break;
+    End;
+    i:=i+1;
+  End;
+  
+  If Not Found Then Begin
+    f.Seek(0,soEnd);
+    r.NameCrc  := User;
+    r.UserNum  := User;
+    r.LastRead := LastRead;
+    r.HighRead := LastRead;
+    f.Write(r,sizeof(r));
+  End;
+  f.free;
+  Result:=True;
+End;
+
+Function TJamBase.MsgAtTextPos(P:LongInt):LongInt;
+Var
+  idx : JamIdxType;
+  M   : JamMsgHdrType;
+  N   : LongInt = 1;
+Begin
+  Result:=-1;
+  If P>=TxtFile.Size Then Exit;
+  
+  While N<=MsgCount Do Begin
+    IndexFile.Seek((N-1) * Sizeof(JamIdxType),0);
+    IndexFile.Read(idx,Sizeof(JamIdxType));
+    
+    If Idx.HdrLoc >0 Then Begin
+      HeaderFile.Seek(Idx.HdrLoc,0);
+      FillChar(M,Sizeof(M),#0);
+      HeaderFile.Read(M,SizeOf(M));
+      
+      If (P>=M.TextOfs) And (P<=M.TextOfs+M.TextLen) Then Begin
+        Result:=N;
+        Break;
+      End;
+      
+    End;
+    N:=N+1;
+  End;
+End;
+
+Function TJamBase.SearchFirst(Sub:String; CS:Boolean):LongInt;
+Begin
+  fSearchPos:=0;
+  Result := SearchNext(Sub,CS);
+End;
+
+Function TJamBase.SearchNext(Sub:String; CS:Boolean):LongInt;
+Var
+  buf:String = '';
+  found : Boolean = False;
+  c : Byte = 0;
+  d : Integer;
+  si : LongInt = 0;
+Begin
+  TxtFile.Seek(fSearchPos,0);
+  si:=fSearchPos;
+  If Not CS Then Sub := Upper(Sub);
+  found:=false;
+  While (txtfile.position < txtfile.size) Do Begin
+    TxtFile.Read(c,1);
+    buf:=buf+chr(c);
+    if (c=10) or (c=13) Then Begin
+      If CS Then d:=Pos(Sub,buf) Else d:=Pos(Sub,Upper(buf));
+      if d>0 Then Begin
+        Result:=si+d-1;
+        fSearchPos:=TxtFile.Position;
+        Found := True;
+        Break;
+      End Else Begin
+        si := TxtFile.Position;
+        buf:='';
+        c:=0;
+      End;
+    End;
+  End; 
+
+  If Not Found Then Begin
+    Result := -1;
+    fSearchPos:=txtfile.size;
+  End;
+  
+End;
+  
 Begin
 End.
