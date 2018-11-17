@@ -54,8 +54,9 @@ Const
 Type
   
   TBItem = Record
-    Text : String;
-    Field1 : String;
+    Text      : String;
+    Field1    : String;
+    Selected  : Boolean;
   End;
   
   TBar = Class
@@ -65,9 +66,8 @@ Type
       FBarOffC: String;
       FX,FY   : Byte;
       FTotal  : Integer;
-      FMore   : Boolean;
-      FMoreX  : BYte;
-      FMoreY  : BYte;
+      
+    
       FMoreCol:String;
       FKey    : Boolean;
       FSearch : String;
@@ -76,12 +76,17 @@ Type
       FBarFgC : Char;
       FBarBgCl: Byte;
       FBarFgCl: Byte;
+      FSelOn  : String;
+      FSelOff : String;
     
       FSearchX: BYte;
       FSearchY: BYte;
       FSearchA: BYte;
       search_idx : Integer;
     Public
+    FMoreX  : BYte;
+    FMoreY  : BYte;
+    FMore   : Boolean;
     Items   : Array Of TBItem;
     OnSelect: Procedure(i:integer);
     OnEnter : Procedure(i:integer);
@@ -98,15 +103,17 @@ Type
     Property MoreCl    : String Read FMoreCol Write FMoreCol;
     Property Position : Integer read BarPos Write BarPos;
     Property Key : Boolean Read FKey write fkey;
-    Property Search:String Read FSearch Write FSEarch;
-    Property SearchX:Byte Read FSearchX write FsearchX;
-    Property Searchy:Byte Read FSearchy write Fsearchy;
-    Property SearchA:Byte Read FSearchA write FsearchA;
-    Property DoBar  :Boolean Read FDoBar Write FDoBar;
-    Property BarBgC: Char Read FBarBgC Write FBarBgC;
-    Property BarFgC : Char Read FBarFgC Write FBarFgC;
-    Property BarBgCl: Byte Read FBarBgCl Write FBarBgCl;
-    Property BarFgCl: Byte Read FBarFgCl Write FBarFgCl;
+    Property Search:String Read FSearch   Write FSEarch;
+    Property SearchX:Byte Read FSearchX   write FsearchX;
+    Property Searchy:Byte Read FSearchy   write Fsearchy;
+    Property SearchA:Byte Read FSearchA   write FsearchA;
+    Property DoBar  :Boolean Read FDoBar  Write FDoBar;
+    Property BarBgC: Char Read FBarBgC    Write FBarBgC;
+    Property BarFgC : Char Read FBarFgC   Write FBarFgC;
+    Property BarBgCl: Byte Read FBarBgCl  Write FBarBgCl;
+    Property BarFgCl: Byte Read FBarFgCl  Write FBarFgCl;
+    Property SelOn  : String Read FSelOn    Write FSelOn;
+    Property SelOff : String Read FSelOff   Write FSelOff;
   End;
 
 
@@ -144,12 +151,14 @@ Begin
   FBarFgC := Chr(178);
   FBarBgCl := 8;
   FBarFgCl := 15;
+  FSelOn:='|17|14';
+  FSelOff:='|16|14'
   
 End;
 
 Destructor TBar.Destroy;
 Begin
-  SetLength(Items,1);
+  SetLength(Items,0);
   Inherited Destroy;
 End;
 
@@ -158,6 +167,7 @@ Begin
   SetLength(Items,Length(Items)+1);
   Items[High(Items)].Text:=S;
   Items[High(Items)].Field1:='';
+  Items[High(Items)].Selected:=False;
   FTotal :=Length(Items);
 ENd;
 {
@@ -200,14 +210,21 @@ Var
   Procedure BarON;
   Begin
     If length(Items)=0 Then Exit;
-    WriteXYPipe(x, y + BarPos - TopPage,7,fbaronc+StrPadR(Items[BarPos].text, w, ' '));
+    If Items[BarPos].Selected Then
+      WriteXYPipe(x, y + BarPos - TopPage,7,FSelon+StrPadR(Items[BarPos].text, strFMCILen(Items[BarPos].text,w), ' '))
+    Else
+      WriteXYPipe(x, y + BarPos - TopPage,7,fbaronc+StrPadR(Items[BarPos].text, strFMCILen(Items[BarPos].text,w), ' '));
     If Assigned(OnSelect) Then OnSelect(BarPos);
   end;
 
   Procedure BarOFF;
   begin
     If Length(Items)=0 Then Exit;
-    WriteXYPipe(x, y + BarPos - TopPage,7,fbaroffc+StrPadR(Items[BarPos].text, w, ' '))
+    
+    If Items[BarPos].Selected Then
+      WriteXYPipe(x, y + BarPos - TopPage,7,fSeloff+StrPadR(Items[BarPos].text, strFMCILen(Items[BarPos].text,w), ' '))
+    Else
+      WriteXYPipe(x, y + BarPos - TopPage,7,fbaroffc+StrPadR(Items[BarPos].text, strFMCILen(Items[BarPos].text,w), ' '))
   end;
   
   Procedure DrawPage;
@@ -279,7 +296,7 @@ Begin
         Ch   := Chr(244);
       End;
 
-      If TopPage + h-1 < fTotal Then begin
+      If TopPage + h + 1 < fTotal Then begin
         Ch2  := Chr(245);
         More := More + 2;
       End;
@@ -298,13 +315,13 @@ Begin
     Ch := ReadKey;
     If Ch=#00 Then begin
       Ch := ReadKey;
-      if ch = Home then begin
+      if ch = KeyHome then begin
         TopPage := 0;
         BarPos  := 0;
         search_idx :=0;
         drawpage;
       end;
-      if ch = EndKey then begin
+      if ch = KeyEnd then begin
         if fTotal > h then begin
           TopPage := fTotal - h; //+1;
           BarPos  := fTotal-1;
@@ -315,19 +332,19 @@ Begin
         drawpage;
       end;
       
-      If Ch = CursorLeft Then BEgin
+      If Ch = KeyCursorLeft Then BEgin
         Result := RLeft;
         search_idx :=0;
         DOne:=true;
       End;
       
-      If Ch = CursorRight Then BEgin
+      If Ch = KeyCursorRight Then BEgin
         Result := RRight;
         search_idx :=0;
         DOne:=true;
       End;
   
-      If Ch = CursorUp Then begin
+      If Ch = KeyCursorUp Then begin
         search_idx :=0;
         If BarPos > TopPage Then begin
           BarOFF;
@@ -342,7 +359,7 @@ Begin
         End;
       end;
   
-      If Ch = PgUp Then begin
+      If Ch = KeyPgUp Then begin
         If FKey Then Begin
             If Assigned(OnOtherKey) Then Begin
               OnOtherKey('[',BarPos);
@@ -363,7 +380,7 @@ Begin
         End;
       end;
   
-    If Ch = CursorDown Then begin
+    If Ch = KeyCursorDown Then begin
       search_idx :=0;
       If BarPos < fTotal-1 Then
         If BarPos < TopPage + h - 1 Then begin
@@ -379,7 +396,7 @@ Begin
         End;
       End;
       
-      If Ch = PgDn Then begin //PGDN
+      If Ch = KeyPgDn Then begin //PGDN
         If FKey Then Begin
           If Assigned(OnOtherKey) Then Begin
             OnOtherKey(']',BarPos);
@@ -418,6 +435,11 @@ Begin
           BarON;
         End;}
      End;
+     
+    If Assigned(OnOtherKey) Then Begin
+      OnOtherKey(Ch,BarPos);
+      DrawPage;
+    End;
 
   //ch:=#0
   End Else Begin
@@ -426,9 +448,13 @@ Begin
       Done := True;
     End Else
     If (Ch = Chr(13)) And (FTotal >= 0) Then Begin
-      Result := BarPos;
+      Result := REnter;
       If Assigned(OnEnter) Then OnEnter(BarPos);
       Done := True;
+    End;
+    If Assigned(OnOtherKey) Then Begin
+        OnOtherKey(Ch,BarPos);
+        DrawPage;
     End;
     If Fkey Then Begin
       If (Ch = '+') Then Begin
@@ -447,7 +473,7 @@ Begin
           Result:=RDiv;
           Done := True;
       End Else
-      If (Ch = BackSpace) Then Begin
+      If (Ch = KeyBackSpace) Then Begin
           Result:=RBackSpace;
           Done := True;
       End Else
@@ -467,7 +493,7 @@ Begin
         search_idx:=0;
         MakeSearch;
       End Else
-      If (Ch = BackSpace) Then Begin
+      If (Ch = KeyBackSpace) Then Begin
         Delete(FSearch,Length(FSearch),1);
         WriteXY(FSearchx,FSearchY,FSearchA,Upper(FSearch)+' ');
         Search_idx:=0;
@@ -478,7 +504,7 @@ Begin
         Write(StrRep(' ',Length(FSearch)));
         FSearch:='';
         search_idx:=0
-      End;
+      End
     End;
   End;
   

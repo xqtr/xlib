@@ -3,6 +3,8 @@
    xLib - xJAM                                                     xqtr
    ====================================================================
    This file is part of xlib for FreePascal
+    
+   https://github.com/xqtr/xlib
    
    This unit is based on code from MysticBBS 1.10 source code and also
    the MK Source for Msg Access v1.06 - Mark May's.
@@ -230,7 +232,8 @@ Type
     Function  LastMsg:Boolean;
     Function  GetMsgCount:LongInt;
     Function  GetMsgText(N:LongInt):Boolean;
-    Function  NextMsg:Boolean;    
+    Function  NextMsg:Boolean;
+    Function  PrevMsg:Boolean;
     Function  SaveHeader:Boolean;
     
     Function  CreateMsgBase (Path,Name:String; MaxMsg: Word; MaxDays: Word): SmallInt;
@@ -243,8 +246,9 @@ Type
     Function  SearchNext(Sub:String; CS:Boolean):LongInt;
     Function  MsgAtTextPos(P:LongInt):LongInt;
     
-    Function  GetLastReadUNum(U:LongInt):LongInt; 
-    Function  GetLastReadUCrc(UCRC:LongInt):LongInt; 
+    Function  GetLastReadUNum(U:LongInt):LongInt;
+    Function  GetLastReadUCrc(UCRC:LongInt):LongInt;
+    Function  GetLastRead:LongInt;
     Function  DeleteUser(U:LongInt):Boolean;
     Function  FindLastRead(UCRC:LongInt; Var L:JamLastType):Boolean;
     Function  SetLastRead(User,LastRead:LongInt):Boolean;
@@ -273,12 +277,31 @@ Type
   Function Str2Addr (S: String; Var Addr: RecEchoMailAddr) : Boolean;
   Function EchoMailAddrValid(Addr:RecEchoMailAddr): Boolean;
   Function JamStrCrc (St: String): LongInt;
+  Function isJamBase(F:String):Boolean;
 
 Implementation
 
 Uses
   xFileIO,
   xDateTime;
+  
+Function isJamBase(F:String):Boolean;
+Var
+  head : JamHdrType;
+  fp   : File;
+Begin
+  Result:=False;
+  If Not FileExist(F) Then Exit;
+  AssignFile(fp,F);
+  Reset(fp,1);
+  If IOResult <> 0 Then Exit;
+  BlockRead(fp,head,SizeOf(head));
+  If (Head.Signature[1] = 'J') And
+        (Head.Signature[2] = 'A') And
+        (Head.Signature[3] = 'M') And
+        (Head.Signature[4] = #0) Then Result:=True;  
+  CloseFile(fp);
+End;  
   
 Function Addr2Str (Addr : RecEchoMailAddr) : String;
 Var
@@ -624,6 +647,14 @@ Begin
   Result:=True;
 End;
 
+Function  TJamBase.PrevMsg:Boolean;
+Begin
+  Result:=False;
+  If MsgNo-1 >= 1 Then MsgNo := MsgNo - 1;
+  If Not LoadMsg(MsgNo) Then Exit;
+  Result:=True;
+End;
+
 Procedure TJamBase.SetAttr1 (Mask: Cardinal; St: Boolean);
 Begin
 If St Then
@@ -747,9 +778,11 @@ Begin
   hdr.MsgNum := Header.ActiveMsgs+1;
   hdr.DateArrived := DateDos2Unix(CurDateDos); {Get date processed}
   hdr.DateWritten := DateDos2Unix(CurDateDos);
-  hdr.Attr1 := hdr.Attr1 Or Jam_TypeLocal;
   
   SetAttr1(Jam_TypeLocal, True);
+  
+  hdr.Attr1 := hdr.Attr1 Or Jam_TypeLocal;
+  
   
   AssignFile(f,Fname);
   Try
@@ -762,7 +795,8 @@ Begin
   txtfile.seek(0,soend);
   hdr.TextOfs := TxtFile.Size;
   hdr.TextLen := FileSize(f)+1;
-    
+  
+  //FillByte(sf2,Sizeof(sf2),0);
   sf2.LoId:=2;
   sf2.HiId:=0;
   If Length(MFrom)>100 THen MFrom:=Copy(MFrom,1,100);
@@ -771,6 +805,7 @@ Begin
   //writeln(int2str(sf2.datalen));
   hdr.SubFieldLen:=hdr.SubFieldLen+8+sf2.DataLen;
   
+  //FillByte(sf3,Sizeof(sf3),0);
   sf3.LoId:=3;
   sf3.HiId:=0;
   If Length(MTo)>100 THen MTo:=Copy(MTo,1,100);
@@ -779,6 +814,7 @@ Begin
   
   hdr.SubFieldLen:=hdr.SubFieldLen+8+sf3.DataLen;
   
+  //FillByte(sf0,Sizeof(sf0),0);
   If EchoMailAddrValid(Faddr) Then Begin
     sf0.LoId:=0;
     sf0.HiId:=0;
@@ -788,6 +824,7 @@ Begin
     hdr.SubFieldLen:=hdr.SubFieldLen+8+sf0.DataLen;
   End;
   
+  //FillByte(sf1,Sizeof(sf1),0);
   If EchoMailAddrValid(Taddr) Then Begin
     sf1.LoId:=1;
     sf1.HiId:=0;
@@ -797,11 +834,12 @@ Begin
     hdr.SubFieldLen:=hdr.SubFieldLen+8+sf1.DataLen;
   End;
   
+  //FillByte(sf6,Sizeof(sf6),0);
   sf6.LoId:=6;
   sf6.HiId:=0;
-  If Length(MSubj)>100 THen MSubj:=Copy(MSubj,1,100);
   //sf6.Data:=MSubj;
-  sf6.DataLen:=Length(msubj);
+  If Length(MSubj)>100 THen MSubj:=Copy(MSubj,1,100);
+  sf6.DataLen:=Length(msubj)+1;
   
   hdr.SubFieldLen:=hdr.SubFieldLen+8+sf6.DataLen;
   
@@ -816,21 +854,27 @@ Begin
   
   HeaderFile.WriteBuffer(hdr,SizeOf(hdr));
   If EchoMailAddrValid(Faddr) Then Begin
-    HeaderFile.WriteBuffer(Sf0,8+sf0.DataLen);
+    HeaderFile.WriteBuffer(Sf0,sizeof(sf0));
     s:=Addr2Str(Faddr);
-    HeaderFile.WriteBuffer(s,sf0.DataLen);
+    HeaderFile.WriteBuffer(s[1],sf0.DataLen);
   End;
   If EchoMailAddrValid(Taddr) Then Begin
-    HeaderFile.WriteBuffer(Sf1,8+sf1.DataLen);
+    HeaderFile.WriteBuffer(Sf1,sizeof(sf1));
     s:=Addr2Str(Taddr);
-    HeaderFile.WriteBuffer(s,sf1.DataLen);
+    HeaderFile.WriteBuffer(s[1],sf1.DataLen);
   End;
-  HeaderFile.WriteBuffer(Sf2,8+sf2.DataLen);
+  {HeaderFile.WriteBuffer(Sf2,8+sf2.DataLen);
   HeaderFile.WriteBuffer(MFrom,sf2.DataLen);
   HeaderFile.WriteBuffer(Sf3,8+sf3.DataLen);
   HeaderFile.WriteBuffer(MTo,sf3.DataLen);
   HeaderFile.WriteBuffer(Sf6,8+sf6.DataLen);
-  HeaderFile.WriteBuffer(MSubj,sf6.DataLen);
+  HeaderFile.WriteBuffer(MSubj,sf6.DataLen);}
+  HeaderFile.WriteBuffer(Sf2,sizeof(sf2));
+  HeaderFile.WriteBuffer(MFrom[1],sf2.DataLen);
+  HeaderFile.WriteBuffer(Sf3,sizeof(sf3));
+  HeaderFile.WriteBuffer(MTo[1],sf3.DataLen);
+  HeaderFile.WriteBuffer(Sf6,sizeof(sf6));
+  HeaderFile.WriteBuffer(MSubj[1],sf6.DataLen);
   
   Try
     TxtFile.Seek(0,SoEnd);
@@ -946,6 +990,30 @@ Begin
     End;
   End;
   f.free;
+End;
+
+Function TJamBase.GetLastRead:LongInt;
+Var
+  f   : TFileStream;
+  lr  : LongInt;
+  sz  : Int64;
+  L   : JamLastType;
+Begin
+  Result := -1;
+  Try
+    f := TFileStream.Create(Filename+'.jlr',fmOpenRead or fmShareDenyNone);
+    f.Seek(0,0);
+  Except
+    Exit;
+  End;
+  sz := F.size;
+  lr:=-1;
+  While F.Position < sz Do Begin
+    F.Read(L,Sizeof(L));
+    if L.HighRead>lr Then lr:=L.HighRead;
+  End;
+  f.free;
+  Result:=lr;
 End;
 
 Function TJamBase.FindLastRead(UCRC:LongInt; Var L:JamLastType):Boolean;

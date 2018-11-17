@@ -4,6 +4,8 @@
    ====================================================================
 
    This file is part of xlib for FreePascal
+   
+   https://github.com/xqtr/xlib
     
    To use this Unit you need the source code of MysticBBS from here:
    https://github.com/fidosoft/mysticbbs, which is shared under GPL
@@ -40,17 +42,19 @@
 Unit xcrt;
 
 interface
-
-{$IFDEF WIN32}
   uses
+{$IFDEF WIN32}
     Windows,
 {$EndIF}
 {$IFDEF UNIX}
-  uses
     Unix,
 {$EndIF}
-  m_output,
-  m_input,
+  {$IFDEF NORMAL}
+    x_normal_output_Linux,
+  {$ELSE}
+    m_output,
+    m_input,
+  {$ENDIF}
   m_types;
 
 const
@@ -62,6 +66,7 @@ const
     PathChar = '\';
   {$EndIF}
   EOL = #13#10;
+  CRLF = #13#10;
   AnsiColours: Array[0..7] of Integer = (0, 4, 2, 6, 1, 5, 3, 7);
   CHARS_ALL = '`1234567890-=\qwertyuiop[]asdfghjkl;''zxcvbnm,./~!@#$%^&*()_+|'+
               'QWERTYUIOP{}ASDFGHJKL:"ZXCVBNM<>? ';
@@ -88,85 +93,115 @@ const
   White         = 15;
 
 
-  Home          = #71;      
-  CursorUp      = #72;     
-  PgUp          = #73;
-  CursorLeft    = #75;      
-  Num5          = #76;     
-  CursorRight   = #77;
-  EndKey        = #79;
-  CursorDown    = #80;
-  PgDn          = #81;
-  Ins           = #82;
-  Del           = #83;
-  BackSpace     = #8;
-  Tab           = #9;
-  Enter         = #13;
-  Esc           = #27;
-  forwardslash  = #47;
-  asterisk      = #42;
-  minus         = #45;
-  plus          = #43;
-  F1            = #59;
-  F2            = #60;
-  F3            = #61;
-  F4            = #62;
-  F5            = #63;
-  F6            = #64;
-  F7            = #65;
-  F8            = #66;
-  F9            = #67;
-  F10           = #68;
-  F11           = #69;
-  F12           = #70;
+  keyHome          = #71;      
+  keyCursorUp      = #72;     
+  keyPgUp          = #73;
+  keyCursorLeft    = #75;      
+  KeyNum5          = #76;     
+  keyCursorRight   = #77;
+  keyEnd           = #79;
+  keyCursorDown    = #80;
+  keyPgDn          = #81;
+  KeyIns           = #82;
+  KeyDel           = #83;
+  KeyBackSpace     = #8;
+  KeyTab           = #9;
+  KeyEnter         = #13;
+  KeyEsc           = #27;
+  Keyforwardslash  = #47;
+  Keyasterisk      = #42;
+  Keyminus         = #45;
+  Keyplus          = #43;
+  KeyF1            = #59;
+  KeyF2            = #60;
+  KeyF3            = #61;
+  KeyF4            = #62;
+  KeyF5            = #63;
+  KeyF6            = #64;
+  KeyF7            = #65;
+  KeyF8            = #66;
+  KeyF9            = #67;
+  KeyF10           = #68;
+  KeyF11           = #69;
+  KeyF12           = #70;
   
-  CtrlA  = #1; 
-  CtrlB  = #2; 
+  keyCtrlA  = #1; 
+  keyCtrlB  = #2; 
   //CtrlC  = #3; 
-  CtrlD  = #4; 
-  CtrlE  = #5; 
-  CtrlF  = #6; 
-  CtrlG  = #7; 
-  CtrlH  = #8; 
-  CtrlI  = #9; 
-  CtrlJ  = #10;
-  CtrlK  = #11;
-  CtrlL  = #12;
-  CtrlM  = #13;
-  CtrlN  = #14;
-  CtrlO  = #15;
-  CtrlP  = #16;
-  CtrlQ  = #17;
-  CtrlR  = #18;
-  CtrlS  = #19;
-  CtrlT  = #20;
-  CtrlU  = #21;
-  CtrlV  = #22;
-  CtrlW  = #23;
-  CtrlX  = #24;
-  CtrlY  = #25;
-  CtrlZ  = #26;
+  keyCtrlD  = #4; 
+  keyCtrlE  = #5; 
+  keyCtrlF  = #6; 
+  keyCtrlG  = #7; 
+  keyCtrlH  = #8; 
+  keyCtrlI  = #9; 
+  keyCtrlJ  = #10;
+  keyCtrlK  = #11;
+  keyCtrlL  = #12;
+  keyCtrlM  = #13;
+  keyCtrlN  = #14;
+  keyCtrlO  = #15;
+  keyCtrlP  = #16;
+  keyCtrlQ  = #17;
+  keyCtrlR  = #18;
+  keyCtrlS  = #19;
+  keyCtrlT  = #20;
+  keyCtrlU  = #21;
+  keyCtrlV  = #22;
+  keyCtrlW  = #23;
+  keyCtrlX  = #24;
+  keyCtrlY  = #25;
+  keyCtrlZ  = #26;
   
-  Alt1 = #248;
-  Alt2 = #249;
-  Alt3 = #250;
-  Alt4 = #251;
-  Alt5 = #252;
-  Alt6 = #253;
-  Alt7 = #254;
-  Alt8 = #255;
-  Alt9 = #134;
-  Alt0 = #135;
+  keyAlt1 = #248;
+  keyAlt2 = #249;
+  keyAlt3 = #250;
+  keyAlt4 = #251;
+  keyAlt5 = #252;
+  keyAlt6 = #253;
+  keyAlt7 = #254;
+  keyAlt8 = #255;
+  keyAlt9 = #134;
+  keyAlt0 = #135;
+  
+  keyALTA  = #30;
+  keyALTB  = #48;
+  keyALTC  = #46;
+  keyALTD  = #32;
+  keyALTE  = #18;
+  keyALTF  = #33;
+  keyALTG  = #34;
+  keyALTH  = #35;
+  keyALTI  = #23;
+  keyALTJ  = #36;
+  keyALTK  = #37;
+  keyALTL  = #38;
+  keyALTM  = #50;
+  keyALTN  = #49;
+  keyALTO  = #24;
+  keyALTP  = #25;
+  keyALTQ  = #16;
+  keyALTR  = #19;
+  keyALTS  = #31;
+  keyALTT  = #20;
+  keyALTU  = #22;
+  KeyAltV  = #175;
+  KeyAltW  = #17;
+  keyALTX  = #45;
+  keyALTY  = #21;
+  keyALTZ  = #44;
+  
   
 type
+  SmallWord = System.Word;
+  TCharInfo = packed record
+    Ch:   char;
+    Attr: byte;
+  End;
   
-    SmallWord = System.Word;
-    TCharInfo = packed record
-      Ch:   char;
-      Attr: byte;
-    End;
+  TOutput = m_output.TOutput;
+  TInput  = m_input.Tinput;
   
-  
+  TConsoleImageRec = m_types.TConsoleImageRec;
   TScreenBuf = TConsoleImageRec;
   
   var
@@ -179,9 +214,10 @@ type
     WindMin:Byte;
     ScreenHeight:Byte;
     ScreenWidth:Byte;
+    Image:TConsoleImageRec;
+    More:String;
 
-
-Procedure RestoreScreen(var screenBuf: TConsoleImageRec);
+Procedure RestoreScreen(screenBuf: TConsoleImageRec);
 Procedure SaveScreen(var screenBuf: TConsoleImageRec);
 Function  GetAttrAt(AX, AY: Byte): Byte;
 Function  GetCharAt(AX, AY: Byte): Char;
@@ -196,19 +232,21 @@ Function  CurrentBG: Byte;
 Procedure TextBackground(CL: Byte);
 Procedure HighVideo;
 Procedure TextColor(CL: Byte);
-Function FgColor(Attr:Byte):Byte;
-Function BgColor(Attr:Byte):Byte;
+Function  FgColor(Attr:Byte):Byte;
+Function  BgColor(Attr:Byte):Byte;
 Procedure GotoXY(X,Y:Byte);
 Procedure GotoX(X:Byte);
 Procedure GotoY(Y:Byte);
 Procedure ClrScr;
 
 Procedure WriteXY (X, Y, A: Byte; Text: String);
-Procedure WriteXYPipe (X, Y, Attr:Byte; Text: String);
-Procedure WritePipe (Str: String);
+Procedure WriteXYPipe (X, Y, Attr:Byte; Text: String); OverLoad;
+Procedure WriteXYPipe (X, Y, Attr,Len: Byte; Text: String); OverLoad;
+Procedure WritePipe (Text: String);
 Procedure WriteLn; Overload;
 Procedure WriteLn(S:String); Overload;
 Procedure Write(S:String);
+Procedure WriteStr(S:String);
 
 Procedure CenterLine(S:String; L:byte);
 
@@ -219,26 +257,31 @@ Procedure BufAddStr (Str: String);
 
 Procedure ClearArea(x1,y1,x2,y2:Byte;C:Char);
 
-Function CTRLC:Boolean;
-Function WhereY:Byte;
-Function WhereX:Byte;
+Function  CTRLC:Boolean;
+Function  WhereY:Byte;
+Function  WhereX:Byte;
 Procedure SetTextAttr(A:Byte);
-Function GetTextAttr:Byte;
-Function AttrToAnsi (Attr: Byte) : String;
+Function  GetTextAttr:Byte;
+Function  AttrToAnsi (Attr: Byte) : String;
 
-Function    KeyWait (MS: LongInt) : Boolean;
-Function    KeyPressed : Boolean;
-Function    ReadKey : Char;
-Function    FAltKey (Ch : Char) : Byte;
-
+Function  KeyWait (MS: LongInt) : Boolean;
+Function  KeyPressed : Boolean;
+Function  ReadKey : Char;
+Function  FAltKey (Ch : Char) : Byte;
+Procedure ClearImage(Var Img:TConsoleImageRec);
 procedure enable_ansi_unix;
-
+procedure AppendText(Filename,S:String);
+Function  FirstFileParam(Ind:Byte):Byte;
 
 implementation
 
 {$IFDEF FPC}
   uses
-    crt,baseunix;
+    crt,
+	{$IFDEF UNIX}
+	baseunix,
+	{$ENDIF}
+	xdatetime,xstrings;
 {$EndIF}
 
 {$IFDEF WIN32}
@@ -246,12 +289,67 @@ implementation
     StdOut: THandle;
 {$EndIF}
 
+Function ParseMCI (Code: String) : Boolean;
+Var
+  A : LongInt;
+Begin
+  Result       := True;
+
+  Case Code[1] of
+    '[' : Case Code[2] of
+            'U' : GotoY(WhereY-1); // Cursor Up
+            'D' : GotoY(WhereY+1); // Cursor Down
+            'L' : GotoX(WhereX-1); //Cursor Left
+            'R' : GotoX(WhereX+1); // Cursor Right
+            'S' : GotoX(1); // Go to then begining of the line
+            'C' : GotoX(ScreenWidth Div 2); // Go to center in line
+          End;
+    'B' : Case Code[2] of
+            'E' : System.Write(^G);
+          End;
+    'C' : Case Code[2] of
+            'L' : ClrScr;
+            'R' : Writeln;
+            'P' : ClearEOL;
+          End;
+    'D' : Case Code[2] of
+            'E' : Delay(500);
+            'S' : Delay(1000);
+            'M' : Delay(70);
+                  
+          End;
+    'O' : Case Code[2] of
+            'S' : {$IFDEF LINUX}Write('Unix');{$ENDIF}{$IFDEF WINDOWS}Write('Windows');{$ENDIF}{$IFDEF ARM}Write('ARM');{$ENDIF}
+          End;
+    'P' : Case Code[2] of
+            'A' : ReadKey;  // Pause
+            'I' : Write(Screen.seth);  // Write Pipe symbol/seth
+            'M' : Begin screen.writepipe(More);ReadKey;End;  // Pause with More prompt
+          End;
+    'S' : Case Code[2] of
+            'S' : SaveScreen(Image);
+          End;
+    'R' : Case Code[2] of
+            'S' : RestoreScreen(Image);
+          End;
+    'T' : Case Code[2] of
+            'D' : Write(FormatDate(CurDateDT , 'dd/mm/yyyy'));
+            'T' : Write(FormatDate(CurDateDT , 'hh:II'));
+          End;
+    'X' : Case Code[2] of
+            'X' : Write(' ');
+          End;
+  Else
+    Result := False;
+  End;
+End;
+
 Function strMCILen (Str: String) : Byte;
 Var
   A : Byte;
 Begin
   Repeat
-    A := Pos('|', Str);
+    A := Pos(Screen.Seth, Str);
     If (A > 0) and (A < Length(Str) - 1) Then
       Delete (Str, A, 3)
     Else
@@ -263,7 +361,7 @@ End;
 
 Function AttrToAnsi (Attr: Byte) : String;
 Begin
-  Screen.AttrToAnsi(Attr);
+  Result:=Screen.AttrToAnsi(Attr);
 End;
 
 Procedure WriteLn; Overload;
@@ -274,6 +372,11 @@ End;
 Procedure WriteLn(S:String); Overload;
 Begin
   Screen.WriteLine(S);
+End;
+
+Procedure WriteStr(S:String);
+Begin
+  Screen.WriteStr(S);
 End;
 
 Procedure Write(S:String);
@@ -305,43 +408,44 @@ End;
 
 Procedure GotoXY(X,Y:Byte);
 Begin
-  Screen.CursorXY(x,y);
+  Screen.GotoXY(x,y);
 End;
 
 Procedure GotoX(X:Byte);
 Begin
-  Screen.CursorXY(x,Screen.CursorY);
+  Screen.GotoXY(x,WhereY);
 End;
 
 Procedure GotoY(Y:Byte);
 Begin
-  Screen.CursorXY(Screen.CursorX,y);
+  Screen.GotoXY(WhereY,y);
 End;
 
 Function WhereX:Byte;
 Begin
- Result := Screen.CursorX;
+ Result := Screen.WhereX;
 End;
 
 Function WhereY:Byte;
 Begin
- Result := Screen.CursorY;
+ Result := Screen.WhereY;
 End;
 
-Procedure RestoreScreen(var screenBuf: TConsoleImageRec);
+Procedure RestoreScreen(screenBuf: TConsoleImageRec);
 Begin
   Screen.PutScreenImage(Screenbuf);
 End;
 
 Procedure SaveScreen(var screenBuf: TConsoleImageRec);
 Begin
-  Screen.GetScreenImage (1, 1, 80, 25, screenBuf);
+  Screen.GetScreenImage (screenBuf);
 End;
 
 Procedure SetAttrAt(AAttr, AX, AY: Byte);
 Begin
   if ((AX < 1) OR (AX > 80) OR (AY < 1) OR (AY > 25)) then Exit;
   Screen.Buffer[AY][AX].Attributes := AAttr;
+  BufFlush;
 End;
 
 
@@ -349,6 +453,7 @@ Procedure SetCharAt(ACh: Char; AX, AY: Byte);
 Begin
   if ((AX < 1) OR (AX > 80) OR (AY < 1) OR (AY > 25)) then Exit;
   Screen.Buffer[AY][AX].UnicodeChar := ACh;
+  BufFlush;
 End;
 
 Function CurrentFG: Byte;
@@ -393,9 +498,58 @@ Begin
 End;
 
 Procedure WriteXYPipe (X, Y, Attr: Byte; Text: String);
+Var
+  Count   : Byte;
+  Code    : String[2];
+  CodeNum : Byte;
+  OldAttr : Byte;
+  OldX    : Byte;
+  OldY    : Byte;
 Begin
-  Screen.WriteXYPipe(x,y,attr,strMCILen(text),text);
+  OldAttr := Screen.TextAttr;
+  OldX    := WhereX;
+  OldY    := WhereY;
+
+  GotoXY (X, Y);
+  SetTextAttr (Attr);
+
+  Count := 1;
+
+  While Count <= Length(Text) Do Begin
+    If Text[Count] = Screen.Seth Then Begin
+      Code    := Copy(Text, Count + 1, 2);
+      CodeNum := Str2Int(Code);
+
+      If (Code = '00') or (CodeNum > 0) Then Begin
+        Inc (Count, 2);
+        If CodeNum in [00..15] Then
+          SetTextAttr (CodeNum + ((Screen.TextAttr SHR 4) AND 7) * 16)
+        Else
+          SetTextAttr ((Screen.TextAttr AND $F) + (CodeNum - 16) * 16);
+      End Else if parsemci(code)=false then 
+      Begin
+        write(Text[Count]);
+        
+      End Else Inc(Count,2);
+    End Else Begin
+      write(Text[Count]);
+    End;
+    Inc (Count);
+  End;
+  SetTextAttr(OldAttr);
+  GotoXY (OldX, OldY);
 End;
+
+
+Procedure WriteXYPipe (X, Y, Attr,Len: Byte; Text: String); OverLoad;
+Begin
+  WriteXYPipe(X,Y,Attr,StrPadR(Text,Len+(Len-StrMCILen(Text)),' '));
+End;
+
+Procedure WritePipe (Text: String);
+begin
+  writexypipe(wherex,wherey,textattr,text);
+end;
 
 Procedure ClearEOL;
 Begin
@@ -456,11 +610,40 @@ Procedure BufAddStr (Str: String);
 Begin
   Screen.BufAddStr (Str);
 End;
+{
+Procedure WritePipe (Text: String);
+Var
+  Count   : Byte;
+  Code    : String[2];
+  CodeNum : Byte;
 
-Procedure WritePipe (Str: String);
-Begin  
-  Screen.WritePipe(Str);
-End;
+Begin
+ 
+
+  Count := 1;
+
+  While Count <= Length(Text) Do Begin
+    If Text[Count] = Screen.Seth Then Begin
+      Code    := Copy(Text, Count + 1, 2);
+      CodeNum := Str2Int(Code);
+
+      If (Code = '00') or (CodeNum > 0) Then Begin
+        Inc (Count, 2);
+        If CodeNum in [00..15] Then
+          SetTextAttr (CodeNum + ((Screen.TextAttr SHR 4) AND 7) * 16)
+        Else
+          SetTextAttr ((Screen.TextAttr AND $F) + (CodeNum - 16) * 16);
+      End Else if parsemci(code)=false then 
+      Begin
+        screen.BufAddStr(Text[Count]);
+      End Else Inc(Count,2);
+    End Else Begin
+      screen.BufAddStr(Text[Count]);
+    End;
+
+    Inc (Count);
+  End;
+End;}
 
 Procedure ClearArea(x1,y1,x2,y2:Byte;C:Char);
 Var
@@ -483,6 +666,7 @@ End;
 Function ReadKey : Char;
 Begin
   Result:=Keyboard.ReadKey
+  //Result:=Crt.ReadKey;
 End;
 
 Function    FAltKey (Ch : Char) : Byte;    
@@ -521,24 +705,71 @@ procedure enable_ansi_unix;
 begin
   Write(#27 + '(U' + #27 + '[0m');
 end; 
-    
 
-Initialization
+procedure AppendText(Filename,S:String);
+Var
+  f:text;
 Begin
-  Screen := TOutput.Create(True);
-  Keyboard := TInput.Create;
-  ScreenHeight:=Crt.ScreenHeight;
-  ScreenWidth:=Crt.ScreenWidth;
+  Assign(f,filename);
+  {$I-}Append(f);{$I+}
+  If IOResult<>0 THen Rewrite(f);
+  System.WriteLn(F,S);
+  Close(f);
+End;
+
+Function FirstFileParam(Ind:Byte):Byte;
+Var
+  i:byte;
+  f:file;
+begin
+  Result:=0;
+  If Paramcount=0 Then Exit;
+  If Ind>=ParamCount Then Exit;
+  i:=Ind;
+  While i<=ParamCount Do Begin
+    Assign(f,paramstr(1));
+    {$I-}Reset(f);{$I+}
+    If IoResult=0 Then Begin
+      Close(f);
+      Result:=i;
+      Break;
+    End;
+  i:=i+1;
+  End;
+end;  
+
+Procedure ClearImage(Var Img:TConsoleImageRec);
+Var
+  y,x:byte;
+Begin
+  With Img Do Begin
+    For Y:=1 to 25 Do 
+      For X:=1 to 80 Do Begin
+        //nilchar(Data[y][x]);
+        Data[y][x].UnicodeChar:=chr(32);
+        Data[y][x].Attributes:=7;
+      End;
+    WhereX :=1;
+    WhereY :=1;
+    CursorA :=7;
+    X1      :=1;
+    X2      :=80;
+    Y1      :=1;
+    Y2      :=25;
+  End;
+End;
+
+
+Begin
+  {$IFDEF UNIX}
+	ScreenHeight:=Crt.ScreenHeight;
+	ScreenWidth:=Crt.ScreenWidth;
+  {$ELSE}
+	ScreenHeight:=25;
+	ScreenWidth:=80;
+  {$ENDIF}
   WindMax:=Crt.WindMax;
   WindMin:=crt.WindMin;
-
-End;
-
-Finalization
-Begin
-  Screen.Free;
-  KeyBoard.Free;
-End;
-
-
+  FillByte(Image,SizeOf(Image),0);
+  More:='Press a Key to continue...';
 End.
