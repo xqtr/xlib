@@ -9,6 +9,8 @@ For contact look at Another Droid BBS [andr01d.zapto.org:9999],
 FSXNet and ArakNet.
    
 ----
+Read the example.pas file to see how to use the units, to make a program of yours.
+----
    
 This library is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
