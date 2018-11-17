@@ -55,6 +55,7 @@ Function InString(Sub,Str:String):Boolean;
 Function strWordGet   (Num: Byte; Str: String; Ch: Char) : String;
 Function strWordBetween (Str,S1,S2: String) : String;
 Function strWordPos   (Num: Byte; Str: String; Ch: Char) : Byte;
+Function strResize    (Str: String) : String;
 Function strWordCount (Str: String; Ch: Char) : Byte;
 Function strStripL    (Str: String; Ch: Char) : String;
 Function strStripR    (Str: String; Ch: Char) : String;
@@ -78,6 +79,8 @@ Function Byte2Hex     (Num: Byte) : String;
 Function Wrap(Var st: String; maxlen: Byte; justify: Boolean): String;
 Function Byte2Pipe(B:Byte):String; Overload;
 Function Real2Str(R:Real; D:Byte):String;
+Function Size2Str(SZ:LongInt):String;
+
 //Function Size2Str(SZ:LongInt):String;
 { Wrap example
 begin
@@ -312,10 +315,17 @@ Begin
   strStripR := Str;
 End;
 
+Function strResize    (Str: String) : String;
+Begin
+  While Str[Length(Str)] <> ' ' Do Dec(Str[0]);
+  strResize := Str;
+End;
+
 Function strStripB (Str: String; Ch: Char) : String;
 Begin
   strStripB := strStripR(strStripL(Str, Ch), Ch);
 End;
+
 Function strWordCount (Str: String; Ch: Char) : Byte;
 Var
   Start : Byte;
@@ -578,7 +588,7 @@ End;
 
 Function  Button(S:String):String;
 Begin
-  Button:='|00|23√ù'+S[1]+'√û|07|16'+Copy(S,2,Length(s)-1);
+  Button:='|00|23›'+S[1]+'ﬁ|07|16'+Copy(S,2,Length(s)-1);
 End;
 
 Function StrToIntDef(S:String; Def:Integer):Integer;
@@ -716,7 +726,33 @@ End;
 
 Function strYN (Bol: Boolean) : String;
 Begin
-  If Bol Then Result := 'Yes' Else Result := 'No';
+  If Bol Then Result := 'Yes' Else Result := 'No ';
+End;
+
+Function Size2Str(SZ:LongInt):String;
+Var Z : String;
+Var Y : Real;
+Var S  : LongInt=1000;
+Var Ti : LongInt=1000;
+Begin
+  If SZ < Ti Then Begin
+    Z:=StrPadL(Int2Str(SZ),5,' ')+'b';
+  End;
+  If SZ > Ti Then Begin
+    Y:=SZ/1000;
+    Z:=StrPadL(Real2Str(Y,0),5,' ')+'K';
+  End;
+    Ti:=Ti*S;
+  If SZ > Ti Then Begin
+    Y:=SZ/Ti;
+    Z:=StrPadL(Real2Str(Y,0),5,' ')+'M';
+  End;
+    Ti:=Ti*S;
+  If SZ > Ti Then Begin
+    Y:=SZ/Ti;
+    Z:=StrPadL(Real2Str(Y,0),5,' ')+'G';
+  End;
+  Size2Str:=Z;
 End;
 
 Begin
